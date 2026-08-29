@@ -107,221 +107,186 @@ def password_check(uname, passwd):
             return u.get('PASS') != passwd
     return True
 
-def login_check(uname_entry, pass_entry, window):
-    global details
-    uname = uname_entry.get().strip()
-    passwd = pass_entry.get().strip()
-
-    if not uname or not passwd:
-        messagebox.showerror("Error", "All fields are required", parent=window)
-    elif uname not in user_names:
-        messagebox.showerror("Error", "Username not found", parent=window)
-    elif password_check(uname, passwd):
-        messagebox.showerror("Error", "Incorrect password", parent=window)
-    else:
-        for u in user_records:
-            if uname == u['NAME']:
-                details = dict(u)
-        messagebox.showinfo("Welcome", "Hey\nWelcome Back!!")
-        window.destroy()
-
-def signup_check(uname_entry, pass_entry, cpass_entry, email_entry, window):
-    global details, Text_box_complete
-    uname = uname_entry.get().strip()
-    passwd = pass_entry.get().strip()
-    cpasswd = cpass_entry.get().strip()
-    email = email_entry.get().strip()
-
-    if not uname or not passwd or not cpasswd or not email:
-        messagebox.showerror("Error", "All fields are required", parent=window)
-    elif uname in user_names:
-        messagebox.showerror("Error", "Username already exists", parent=window)
-    elif passwd != cpasswd:
-        messagebox.showerror("Error", "Password and Confirm Password must be the same", parent=window)
-    else:
-        details["NAME"] = uname
-        details["EMAIL ID"] = email
-        details["PASS"] = passwd
-        
-        while True:
-            uid_char = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
-            uid = "#" + "".join(random.choices(uid_char, k=6))
-            if uid not in user_ids:
-                details["USER ID"] = uid
-                break
-
-        # Save to LG.dat
-        try:
-            with open("LG.dat", "ab") as f:
-                pickle.dump(details, f)
-        except Exception as e:
-            print("Error saving to LG.dat:", e)
-
-        # Update in-memory lists
-        user_records.append(details.copy())
-        user_names.append(details["NAME"])
-        user_ids.append(details["USER ID"])
-
-        # Insert into Database
-        try:
-            mycon = db.connect(host='localhost', user='root', password='987654321', database='mechflight')
-            c = mycon.cursor()
-            c.execute('insert into scores values (%s, %s, 0);', (details['USER ID'], details['NAME']))
-            mycon.commit()
-            mycon.close()
-        except Exception as e:
-            print("DB Signup Error:", e)
-
-        messagebox.showinfo("Finished", "Registered successfully")
-        Text_box_complete = False
-        window.destroy()
-
-def open_login():
-    login_pg = Tk()
-    login_pg.title("Mechflight - Login")
-    login_pg.geometry("1200x600")
-    try:
-        login_pg.state('zoomed')
-    except Exception:
-        pass
-
-    try:
-        img2 = Image.open("lgbg.jpg")
-        photo = ImageTk.PhotoImage(img2)
-        img2_label = Label(login_pg, image=photo)
-        img2_label.image = photo
-        img2_label.pack(fill="both", expand="yes")
-    except Exception:
-        login_pg.configure(bg="black")
-
-    login_frame = Frame(login_pg, bg="black")
-    frame_width = 500
-    frame_height = 500
-    screen_width_tk = login_pg.winfo_screenwidth()
-    screen_height_tk = login_pg.winfo_screenheight()
-    x = (screen_width_tk // 2) - (frame_width // 2)
-    y = (screen_height_tk // 2) - (frame_height // 2)
-    login_frame.place(x=x, y=y, width=frame_width, height=frame_height)
-
-    caption = Label(login_frame, text="Welcome Warrior!!", font=("Impact", 30), fg="white", bg="black")
-    caption.place(x=50, y=45)
-
-    uname_lbl = Label(login_frame, text="Username", font=("Arial", 14, "bold"), fg="grey", bg="black")
-    uname_lbl.place(x=70, y=150)
-    uname_entry = Entry(login_frame, highlightthickness=2, relief=FLAT, font=("Arial", 14))
-    uname_entry.place(x=75, y=180, width=350, height=35)
-
-    pass_lbl = Label(login_frame, text="Password", font=("Arial", 14, "bold"), fg="grey", bg="black")
-    pass_lbl.place(x=70, y=250)
-    pass_entry = Entry(login_frame, highlightthickness=2, relief=FLAT, font=("Arial", 14), show="•")
-    pass_entry.place(x=75, y=280, width=350, height=35)
-
-    login_btn = Button(login_frame, text="Login", bg="blue", fg="white", bd=0, font=("Impact", 18), cursor="hand2",
-                       command=lambda: login_check(uname_entry, pass_entry, login_pg))
-    login_btn.place(x=75, y=360, width=350, height=50)
-
-    noacc_lbl = Label(login_frame, text="Don't have an account? Sign up!", font=("Arial", 11), fg="grey", bg="black")
-    noacc_lbl.place(x=75, y=430)
-
-    back_btn = Button(login_pg, text="< Back", font=("Impact", 20), fg="white", bg="black", cursor="hand2",
-                      command=login_pg.destroy)
-    back_btn.place(x=10, y=10, width=100, height=50)
-
-    login_pg.mainloop()
-
-def open_signup():
-    sign_pg = Tk()
-    sign_pg.title("Mechflight - Sign Up")
-    sign_pg.geometry("1200x600")
-    try:
-        sign_pg.state('zoomed')
-    except Exception:
-        pass
-
-    try:
-        img2 = Image.open("lgbg.jpg")
-        photo = ImageTk.PhotoImage(img2)
-        img2_label = Label(sign_pg, image=photo)
-        img2_label.image = photo
-        img2_label.pack(fill="both", expand="yes")
-    except Exception:
-        sign_pg.configure(bg="black")
-
-    sign_frame = Frame(sign_pg, bg="black")
-    frame_width = 500
-    frame_height = 580
-    screen_width_tk = sign_pg.winfo_screenwidth()
-    screen_height_tk = sign_pg.winfo_screenheight()
-    x = (screen_width_tk // 2) - (frame_width // 2)
-    y = (screen_height_tk // 2) - (frame_height // 2)
-    sign_frame.place(x=x, y=y, width=frame_width, height=frame_height)
-
-    caption = Label(sign_frame, text="Get Ready Warrior!!", font=("Impact", 30), fg="white", bg="black")
-    caption.place(x=35, y=30)
-
-    uname_lbl = Label(sign_frame, text="Username", font=("Arial", 12, "bold"), fg="grey", bg="black")
-    uname_lbl.place(x=70, y=110)
-    uname_entry = Entry(sign_frame, highlightthickness=2, relief=FLAT, font=("Arial", 13))
-    uname_entry.place(x=75, y=135, width=350, height=35)
-
-    password_lbl = Label(sign_frame, text="Password", font=("Arial", 12, "bold"), fg="grey", bg="black")
-    password_lbl.place(x=70, y=190)
-    password_entry = Entry(sign_frame, highlightthickness=2, relief=FLAT, font=("Arial", 13), show="•")
-    password_entry.place(x=75, y=215, width=350, height=35)
-
-    cpassword_lbl = Label(sign_frame, text="Confirm Password", font=("Arial", 12, "bold"), fg="grey", bg="black")
-    cpassword_lbl.place(x=70, y=270)
-    cpassword_entry = Entry(sign_frame, highlightthickness=2, relief=FLAT, font=("Arial", 13), show="•")
-    cpassword_entry.place(x=75, y=295, width=350, height=35)
-
-    email_lbl = Label(sign_frame, text="Email", font=("Arial", 12, "bold"), fg="grey", bg="black")
-    email_lbl.place(x=70, y=350)
-    email_entry = Entry(sign_frame, highlightthickness=2, relief=FLAT, font=("Arial", 13))
-    email_entry.place(x=75, y=375, width=350, height=35)
-
-    confirm_btn = Button(sign_frame, text="Confirm", bg="blue", fg="white", bd=0, font=("Impact", 18), cursor="hand2",
-                         command=lambda: signup_check(uname_entry, password_entry, cpassword_entry, email_entry, sign_pg))
-    confirm_btn.place(x=75, y=450, width=350, height=50)
-
-    back_btn = Button(sign_pg, text="< Back", font=("Impact", 20), fg="white", bg="black", cursor="hand2",
-                      command=sign_pg.destroy)
-    back_btn.place(x=10, y=10, width=100, height=50)
-
-    sign_pg.mainloop()
-
 def launch_auth_flow():
-    while not details:
-        root = Tk()
-        root.title("Mechflight - Welcome")
-        root.geometry("1200x600")
-        try:
-            root.state('zoomed')
-        except Exception:
-            pass
+    global details
+    auth_success = False
 
-        try:
-            img1 = Image.open("lgbg.jpg")
-            photo = ImageTk.PhotoImage(img1)
-            img1_label = Label(root, image=photo)
-            img1_label.image = photo
-            img1_label.pack(fill="both", expand="yes")
-        except Exception:
-            root.configure(bg="black")
+    root = Tk()
+    root.title("Mechflight - Authentication")
+    root.geometry("1200x650")
+    try:
+        root.state('zoomed')
+    except Exception:
+        pass
 
-        login_btn = Button(root, text="Login", font=("Impact", 20), fg="white", bg="black", cursor="hand2",
-                           command=lambda: [root.destroy(), open_login()])
-        login_btn.place(x=300, y=500, width=250, height=60)
+    bg_photo = None
+    try:
+        img_bg = Image.open("lgbg.jpg")
+        bg_photo = ImageTk.PhotoImage(img_bg)
+        bg_label = Label(root, image=bg_photo)
+        bg_label.image = bg_photo
+        bg_label.pack(fill="both", expand="yes")
+    except Exception:
+        root.configure(bg="black")
 
-        signup_btn = Button(root, text="Sign Up", font=("Impact", 20), fg="white", bg="black", cursor="hand2",
-                            command=lambda: [root.destroy(), open_signup()])
-        signup_btn.place(x=650, y=500, width=250, height=60)
+    welcome_frame = Frame(root, bg="black")
+    login_frame = Frame(root, bg="black")
+    signup_frame = Frame(root, bg="black")
 
-        root.mainloop()
-        
-        # User closed main window without logging in/signing up
-        if not details:
-            return False
-    return True
+    def show_frame(frame_to_show):
+        welcome_frame.place_forget()
+        login_frame.place_forget()
+        signup_frame.place_forget()
+
+        frame_w = 500
+        frame_h = 580 if frame_to_show == signup_frame else 500
+        screen_w = root.winfo_screenwidth()
+        screen_h = root.winfo_screenheight()
+        x = (screen_w // 2) - (frame_w // 2)
+        y = (screen_h // 2) - (frame_h // 2)
+        frame_to_show.place(x=x, y=y, width=frame_w, height=frame_h)
+
+    # --- 1. WELCOME FRAME ---
+    w_caption = Label(welcome_frame, text="MECHFLIGHT", font=("Impact", 40), fg="white", bg="black")
+    w_caption.place(relx=0.5, y=80, anchor="center")
+
+    w_sub = Label(welcome_frame, text="Choose an option to continue", font=("Arial", 14), fg="grey", bg="black")
+    w_sub.place(relx=0.5, y=160, anchor="center")
+
+    w_login_btn = Button(welcome_frame, text="Login", font=("Impact", 22), fg="white", bg="blue", bd=0, cursor="hand2",
+                         command=lambda: show_frame(login_frame))
+    w_login_btn.place(relx=0.5, y=260, width=350, height=60, anchor="center")
+
+    w_signup_btn = Button(welcome_frame, text="Sign Up", font=("Impact", 22), fg="white", bg="darkgreen", bd=0, cursor="hand2",
+                          command=lambda: show_frame(signup_frame))
+    w_signup_btn.place(relx=0.5, y=360, width=350, height=60, anchor="center")
+
+    # --- 2. LOGIN FRAME ---
+    l_caption = Label(login_frame, text="Welcome Warrior!!", font=("Impact", 30), fg="white", bg="black")
+    l_caption.place(x=50, y=30)
+
+    l_uname_lbl = Label(login_frame, text="Username", font=("Arial", 13, "bold"), fg="grey", bg="black")
+    l_uname_lbl.place(x=70, y=120)
+    l_uname_entry = Entry(login_frame, highlightthickness=2, relief=FLAT, font=("Arial", 13))
+    l_uname_entry.place(x=75, y=145, width=350, height=35)
+
+    l_pass_lbl = Label(login_frame, text="Password", font=("Arial", 13, "bold"), fg="grey", bg="black")
+    l_pass_lbl.place(x=70, y=210)
+    l_pass_entry = Entry(login_frame, highlightthickness=2, relief=FLAT, font=("Arial", 13), show="•")
+    l_pass_entry.place(x=75, y=235, width=350, height=35)
+
+    def do_login():
+        nonlocal auth_success
+        uname = l_uname_entry.get().strip()
+        passwd = l_pass_entry.get().strip()
+        if not uname or not passwd:
+            messagebox.showerror("Error", "All fields are required", parent=root)
+        elif uname not in user_names:
+            messagebox.showerror("Error", "Username not found", parent=root)
+        elif password_check(uname, passwd):
+            messagebox.showerror("Error", "Incorrect password", parent=root)
+        else:
+            for u in user_records:
+                if uname == u['NAME']:
+                    details.clear()
+                    details.update(u)
+            messagebox.showinfo("Welcome", "Hey\nWelcome Back!!")
+            auth_success = True
+            root.destroy()
+
+    l_btn = Button(login_frame, text="Login", bg="blue", fg="white", bd=0, font=("Impact", 18), cursor="hand2", command=do_login)
+    l_btn.place(x=75, y=320, width=350, height=50)
+
+    l_back_btn = Button(login_frame, text="< Back", font=("Impact", 14), fg="white", bg="grey", cursor="hand2",
+                        command=lambda: show_frame(welcome_frame))
+    l_back_btn.place(x=75, y=400, width=350, height=40)
+
+    # --- 3. SIGNUP FRAME ---
+    s_caption = Label(signup_frame, text="Get Ready Warrior!!", font=("Impact", 30), fg="white", bg="black")
+    s_caption.place(x=35, y=25)
+
+    s_uname_lbl = Label(signup_frame, text="Username", font=("Arial", 12, "bold"), fg="grey", bg="black")
+    s_uname_lbl.place(x=70, y=95)
+    s_uname_entry = Entry(signup_frame, highlightthickness=2, relief=FLAT, font=("Arial", 12))
+    s_uname_entry.place(x=75, y=120, width=350, height=35)
+
+    s_pass_lbl = Label(signup_frame, text="Password", font=("Arial", 12, "bold"), fg="grey", bg="black")
+    s_pass_lbl.place(x=70, y=170)
+    s_pass_entry = Entry(signup_frame, highlightthickness=2, relief=FLAT, font=("Arial", 12), show="•")
+    s_pass_entry.place(x=75, y=195, width=350, height=35)
+
+    s_cpass_lbl = Label(signup_frame, text="Confirm Password", font=("Arial", 12, "bold"), fg="grey", bg="black")
+    s_cpass_lbl.place(x=70, y=245)
+    s_cpass_entry = Entry(signup_frame, highlightthickness=2, relief=FLAT, font=("Arial", 12), show="•")
+    s_cpass_entry.place(x=75, y=270, width=350, height=35)
+
+    s_email_lbl = Label(signup_frame, text="Email", font=("Arial", 12, "bold"), fg="grey", bg="black")
+    s_email_lbl.place(x=70, y=320)
+    s_email_entry = Entry(signup_frame, highlightthickness=2, relief=FLAT, font=("Arial", 12))
+    s_email_entry.place(x=75, y=345, width=350, height=35)
+
+    def do_signup():
+        nonlocal auth_success
+        global Text_box_complete
+        uname = s_uname_entry.get().strip()
+        passwd = s_pass_entry.get().strip()
+        cpasswd = s_cpass_entry.get().strip()
+        email = s_email_entry.get().strip()
+
+        if not uname or not passwd or not cpasswd or not email:
+            messagebox.showerror("Error", "All fields are required", parent=root)
+        elif uname in user_names:
+            messagebox.showerror("Error", "Username already exists", parent=root)
+        elif passwd != cpasswd:
+            messagebox.showerror("Error", "Password and Confirm Password must be the same", parent=root)
+        else:
+            details.clear()
+            details["NAME"] = uname
+            details["EMAIL ID"] = email
+            details["PASS"] = passwd
+
+            while True:
+                uid_char = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+                uid = "#" + "".join(random.choices(uid_char, k=6))
+                if uid not in user_ids:
+                    details["USER ID"] = uid
+                    break
+
+            try:
+                with open("LG.dat", "ab") as f:
+                    pickle.dump(details, f)
+            except Exception as e:
+                print("Error saving to LG.dat:", e)
+
+            user_records.append(details.copy())
+            user_names.append(details["NAME"])
+            user_ids.append(details["USER ID"])
+
+            try:
+                mycon = db.connect(host='localhost', user='root', password='987654321', database='mechflight')
+                c = mycon.cursor()
+                c.execute('insert into scores values (%s, %s, 0);', (details['USER ID'], details['NAME']))
+                mycon.commit()
+                mycon.close()
+            except Exception as e:
+                print("DB Signup Error:", e)
+
+            messagebox.showinfo("Finished", "Registered successfully")
+            Text_box_complete = False
+            auth_success = True
+            root.destroy()
+
+    s_btn = Button(signup_frame, text="Confirm", bg="blue", fg="white", bd=0, font=("Impact", 18), cursor="hand2", command=do_signup)
+    s_btn.place(x=75, y=410, width=350, height=50)
+
+    s_back_btn = Button(signup_frame, text="< Back", font=("Impact", 14), fg="white", bg="grey", cursor="hand2",
+                        command=lambda: show_frame(welcome_frame))
+    s_back_btn.place(x=75, y=480, width=350, height=40)
+
+    show_frame(welcome_frame)
+
+    root.mainloop()
+    return auth_success
 
 # --- PYGAME HELPER FUNCTIONS ---
 
