@@ -1,2 +1,14 @@
+# Byte-compiled files
 __pycache__/
-*.pyc
+*.py[cod]
+*.class
+
+# Local user binaries & temp code runners
+LG.dat
+tempCodeRunnerFile.py
+
+# System files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
