@@ -444,21 +444,26 @@ def game():
 
     # BG MAPPING (Full Screen Dynamic Scaling)
     back = pygame.transform.scale(pygame.image.load("back6.jpg"), (screen_width, g_limit))
-    ground = pygame.transform.scale(pygame.image.load("ground.jpg"), (screen_width, 110))
+    ground = pygame.transform.scale(pygame.image.load("ground.jpg"), (screen_width, 130))
     back_width = back.get_width()
     ground_width = ground.get_width()
     tiles = math.ceil(screen_width / back_width) + 3
     tiles1 = math.ceil(screen_width / ground_width) + 3
 
     def bg_move():
+        # Dino-game style difficulty scaling (smoothly increases speed as score goes up)
+        current_speed = min(18, 6 + (pd['score'] * 0.025))
+        pd['obs'] = current_speed
+        sky_speed = current_speed * 0.4
+
         for i in range(tiles):
             screen.blit(back, (i * back_width - pd['roll1'], 0))
         for j in range(tiles1):
             screen.blit(ground, (j * ground_width - pd['roll'], g_limit))
 
         if not pd['dead']:
-            pd['roll1'] += 3
-            pd['roll'] += 6
+            pd['roll1'] += sky_speed
+            pd['roll'] += current_speed
 
             if pd['roll1'] >= back_width:
                 pd['roll1'] = 0
