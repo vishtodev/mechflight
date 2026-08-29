@@ -432,7 +432,7 @@ def game():
     fps = 60
     g_limit = screen_height - 110
 
-    pd = {'roll': 0, 'roll1': 0, 'obs': 6, 'p_change': 7, 'dead': False, 'times': 0, 'e0': 0, 'jump': False,
+    pd = {'roll': 0, 'roll1': 0, 'obs': 6, 'p_change': 5, 'dead': False, 'times': 0, 'e0': 0, 'jump': False,
           'draw': True, 'score': 0, 'sc_d': 0, 'hs': 0}
     font = load_font('ARCADE_N.TTF', 36)
 
@@ -517,7 +517,7 @@ def game():
                 pd['jump'] = True
                 p_rec.y -= pd['p_change']
             elif p_rec.y < p_y:
-                p_rec.y += 6  # gravity fall
+                p_rec.y += 4  # gravity fall
 
             if p_rec.x < screen_width // 4:
                 p_rec.x += 2
