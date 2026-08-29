@@ -1,759 +1,782 @@
 from tkinter import *
 from tkinter import messagebox
-from PIL import ImageTk,Image
+from PIL import ImageTk, Image
 import random
 import pickle
 import pygame
 import math
+import os
 import mysql.connector as db
 
 pygame.init()
 
-Text_box_complete=True
+# Detect monitor resolution for Full Screen mode
+info = pygame.display.Info()
+screen_width = info.current_w
+screen_height = info.current_h
 
-#FOR CHECKING WHETHER LG.DAT EXISTS
-try:
-    f=open('LG.dat','rb')
-    f.close()
-except:
-    f=open('LG.dat','wb')
-    f.close()
+Text_box_complete = False
+details = {}
+user_records = []
+user_names = []
+user_ids = []
 
-#FOR CHECKING WHETHER DATABASE EXISTS
-mycon=db.connect(host='localhost',user='root',password='987654321')
-c=mycon.cursor()
-try:
-    c.execute('use mechflight;')
-    c.execute('select * from scores;')
-except:
-    c.execute('drop database if exists mechflight;')
-    c.execute('create database mechflight;')
-    c.execute('use mechflight;')
-    c.execute('create table scores(id varchar(7),name varchar(20),highscore int)')
-    mycon.commit()
+# --- DATABASE & STORAGE HELPERS ---
 
-mycon.close()
+def init_db():
+    try:
+        mycon = db.connect(host='localhost', user='root', password='987654321')
+        c = mycon.cursor()
+        try:
+            c.execute('use mechflight;')
+            c.execute('select * from scores;')
+        except Exception:
+            c.execute('drop database if exists mechflight;')
+            c.execute('create database mechflight;')
+            c.execute('use mechflight;')
+            c.execute('create table scores(id varchar(7), name varchar(20), highscore int);')
+            mycon.commit()
+        mycon.close()
+    except Exception as e:
+        print("Database Connection Warning (running in standalone mode if DB offline):", e)
 
-#GETTING RECORDS FROM LG.DAT
-details={}
-f = open("LG.dat","rb")
-de={}
-l=[]
-ln=[]
-id_check=[]
-try:
-    while 1:
-        de=pickle.load(f)
-        l.append(de)
-        ln.append(de["NAME"])
-        id_check.append(de["USER ID"])
-except:
-    f.close()
-
-#LOGIN AND SIGN UP PAGE
-
-def lstologin():
-    root.destroy()
-    open_login()
-
-def lstosignup():
-    root.destroy()
-    open_signup()
-
-def logintols():
-    login_pg.destroy()
-    ls()
-
-def signuptols():
-    sign_pg.destroy()
-    ls()
-
-def signuptologin():
-    sign_pg.destroy()
-    open_login()
-
-def logintohome():
-    login_pg.destroy()
-    open_home()
-
-def signuptohome():
-    sign_pg.destroy()
-    open_home()
-
-def password_check():
-    c=0
-    for i in l:
-        if uname_entry.get()==i['NAME']:
-            if pass_entry.get()!=i["PASS"]:
-                c+=1
-    return c
-
-def login_check():
-    global details
-    if pass_entry.get()=="" or uname_entry.get()=="":
-        messagebox.showerror("Error","All fields are required",parent=login_pg)
-    elif uname_entry.get() not in ln:
-        messagebox.showerror("Error","Username not found",parent=login_pg)
-    elif password_check():
-        messagebox.showerror("Error","Incorrect password",parent=login_pg)
-    else:
-        for i in l:
-            if uname_entry.get()==i['NAME']:
-                details=dict(i)
-        messagebox.showinfo("Welcome","Hey\nWelcome Back!!")
-        logintohome()
-
-def signup_check():
-    global Text_box_complete
-    if uname_entry.get()=="" or password_entry.get()=="" or cpassword_entry.get()=="" or email_entry.get()=="":
-        messagebox.showerror("Error", "All fields are required",parent=sign_pg)
-    elif uname_entry.get() in ln:
-        messagebox.showerror("Error", "Username already exist",parent=sign_pg)
-    elif password_entry.get() != cpassword_entry.get():
-        messagebox.showerror("Error","Password and Confirm Password mush be same",parent=sign_pg) 
-    else:
-        details["NAME"]=uname_entry.get()
-        details["EMAIL ID"]=email_entry.get()
-        details["PASS"]=password_entry.get()
-        while True:
-            uid_char=['0','1','2','3','4','5','6','7','8','9']
-            uid="#"
-            for i in range(6):
-                x=random.randint(0,9)
-                uid+=uid_char[x]
-            if uid not in id_check:
-                    details["USER ID"]=uid
-                    break
-        
-        #CREATING RECORDS IN LG.dat
-        f=open("LG.dat","ab")
-        pickle.dump(details,f)
-        f.close()
-
-        #CREATING TUPLES IN DATABASE
-        mycon=db.connect(host='localhost',user='root',password='987654321',database='mechflight')
-        c=mycon.cursor()
-        c.execute('insert into scores values ("{}","{}",0)'.format(details['USER ID'],details['NAME']))
+def save_score_to_db(user_id, score):
+    if not user_id:
+        return
+    try:
+        mycon = db.connect(host='localhost', user='root', password='987654321', database='mechflight')
+        c = mycon.cursor()
+        c.execute('select highscore from scores where id=%s;', (user_id,))
+        res = c.fetchone()
+        if res is None:
+            c.execute('insert into scores values (%s, %s, %s);', (user_id, details.get('NAME', 'Player'), score))
+        else:
+            c.execute('update scores set highscore=%s where id=%s and highscore < %s;', (score, user_id, score))
         mycon.commit()
         mycon.close()
+    except Exception as e:
+        print("DB update error:", e)
 
-        messagebox.showinfo("Finished","Registered successfully")
-        Text_box_complete=False
-        signuptohome()
+def fetch_highscore_db(user_id):
+    if not user_id:
+        return 0
+    try:
+        mycon = db.connect(host='localhost', user='root', password='987654321', database='mechflight')
+        c = mycon.cursor()
+        c.execute('select highscore from scores where id=%s;', (user_id,))
+        res = c.fetchone()
+        mycon.close()
+        if res:
+            return res[0]
+    except Exception as e:
+        print("DB fetch error:", e)
+    return 0
 
+def load_user_data():
+    global user_records, user_names, user_ids
+    user_records = []
+    user_names = []
+    user_ids = []
     
+    if not os.path.exists('LG.dat'):
+        with open('LG.dat', 'wb') as f:
+            pass
+
+    try:
+        with open('LG.dat', 'rb') as f:
+            while True:
+                try:
+                    de = pickle.load(f)
+                    user_records.append(de)
+                    user_names.append(de.get("NAME", ""))
+                    user_ids.append(de.get("USER ID", ""))
+                except EOFError:
+                    break
+    except Exception as e:
+        print("Error loading LG.dat:", e)
+
+# Run initial setups
+init_db()
+load_user_data()
+
+# --- TKINTER LOGIN & SIGNUP SCREENS ---
+
+def password_check(uname, passwd):
+    for u in user_records:
+        if uname == u.get('NAME'):
+            return u.get('PASS') != passwd
+    return True
+
+def login_check(uname_entry, pass_entry, window):
+    global details
+    uname = uname_entry.get().strip()
+    passwd = pass_entry.get().strip()
+
+    if not uname or not passwd:
+        messagebox.showerror("Error", "All fields are required", parent=window)
+    elif uname not in user_names:
+        messagebox.showerror("Error", "Username not found", parent=window)
+    elif password_check(uname, passwd):
+        messagebox.showerror("Error", "Incorrect password", parent=window)
+    else:
+        for u in user_records:
+            if uname == u['NAME']:
+                details = dict(u)
+        messagebox.showinfo("Welcome", "Hey\nWelcome Back!!")
+        window.destroy()
+
+def signup_check(uname_entry, pass_entry, cpass_entry, email_entry, window):
+    global details, Text_box_complete
+    uname = uname_entry.get().strip()
+    passwd = pass_entry.get().strip()
+    cpasswd = cpass_entry.get().strip()
+    email = email_entry.get().strip()
+
+    if not uname or not passwd or not cpasswd or not email:
+        messagebox.showerror("Error", "All fields are required", parent=window)
+    elif uname in user_names:
+        messagebox.showerror("Error", "Username already exists", parent=window)
+    elif passwd != cpasswd:
+        messagebox.showerror("Error", "Password and Confirm Password must be the same", parent=window)
+    else:
+        details["NAME"] = uname
+        details["EMAIL ID"] = email
+        details["PASS"] = passwd
+        
+        while True:
+            uid_char = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+            uid = "#" + "".join(random.choices(uid_char, k=6))
+            if uid not in user_ids:
+                details["USER ID"] = uid
+                break
+
+        # Save to LG.dat
+        try:
+            with open("LG.dat", "ab") as f:
+                pickle.dump(details, f)
+        except Exception as e:
+            print("Error saving to LG.dat:", e)
+
+        # Update in-memory lists
+        user_records.append(details.copy())
+        user_names.append(details["NAME"])
+        user_ids.append(details["USER ID"])
+
+        # Insert into Database
+        try:
+            mycon = db.connect(host='localhost', user='root', password='987654321', database='mechflight')
+            c = mycon.cursor()
+            c.execute('insert into scores values (%s, %s, 0);', (details['USER ID'], details['NAME']))
+            mycon.commit()
+            mycon.close()
+        except Exception as e:
+            print("DB Signup Error:", e)
+
+        messagebox.showinfo("Finished", "Registered successfully")
+        Text_box_complete = False
+        window.destroy()
+
 def open_login():
-    global login_pg
-    global uname_entry, pass_entry
+    login_pg = Tk()
+    login_pg.title("Mechflight - Login")
+    login_pg.geometry("1200x600")
+    try:
+        login_pg.state('zoomed')
+    except Exception:
+        pass
 
-    login_pg=Tk()
-    login_pg.title("Mechflight")
-    login_pg.geometry("1200x600+0+0")
-    login_pg.state('zoomed')
-    
-    img2=Image.open("lgbg.jpg")
-    photo= ImageTk.PhotoImage(img2)
-    img2_label=Label(login_pg, image=photo)
-    img2_label.image=photo
-    img2_label.pack(fill="both",expand="yes")
+    try:
+        img2 = Image.open("lgbg.jpg")
+        photo = ImageTk.PhotoImage(img2)
+        img2_label = Label(login_pg, image=photo)
+        img2_label.image = photo
+        img2_label.pack(fill="both", expand="yes")
+    except Exception:
+        login_pg.configure(bg="black")
 
-    login_frame= Frame(login_pg, bg="black")
+    login_frame = Frame(login_pg, bg="black")
     frame_width = 500
     frame_height = 500
-    screen_width = login_pg.winfo_screenwidth()
-    screen_height = login_pg.winfo_screenheight()
-    x = (screen_width // 2) - (frame_width // 2)
-    y = (screen_height // 2) - (frame_height // 2)
+    screen_width_tk = login_pg.winfo_screenwidth()
+    screen_height_tk = login_pg.winfo_screenheight()
+    x = (screen_width_tk // 2) - (frame_width // 2)
+    y = (screen_height_tk // 2) - (frame_height // 2)
     login_frame.place(x=x, y=y, width=frame_width, height=frame_height)
 
-    caption=Label(login_frame,text="Welcome Warrior!!",font=("perfect-dark-brk\\pdark.ttf",35,"bold"),fg="white",bg="black")
-    caption.place(x=50,y=45)
+    caption = Label(login_frame, text="Welcome Warrior!!", font=("Impact", 30), fg="white", bg="black")
+    caption.place(x=50, y=45)
 
-    uname_lbl=Label(login_frame,text="Username",font=("goudy old style",15,"bold"),fg="grey",bg="black")
-    uname_lbl.place(x=70,y=150)
+    uname_lbl = Label(login_frame, text="Username", font=("Arial", 14, "bold"), fg="grey", bg="black")
+    uname_lbl.place(x=70, y=150)
+    uname_entry = Entry(login_frame, highlightthickness=2, relief=FLAT, font=("Arial", 14))
+    uname_entry.place(x=75, y=180, width=350, height=35)
 
-    uname_entry=Entry(login_frame,highlightthickness=5,relief=FLAT,font=("times new roman",15))
-    uname_entry.place(x=75,y=180,width=350,height=35)
+    pass_lbl = Label(login_frame, text="Password", font=("Arial", 14, "bold"), fg="grey", bg="black")
+    pass_lbl.place(x=70, y=250)
+    pass_entry = Entry(login_frame, highlightthickness=2, relief=FLAT, font=("Arial", 14), show="•")
+    pass_entry.place(x=75, y=280, width=350, height=35)
 
-    pass_lbl=Label(login_frame,text="Password",font=("goudy old style",15,"bold"),fg="grey",bg="black")
-    pass_lbl.place(x=70,y=250)
+    login_btn = Button(login_frame, text="Login", bg="blue", fg="white", bd=0, font=("Impact", 18), cursor="hand2",
+                       command=lambda: login_check(uname_entry, pass_entry, login_pg))
+    login_btn.place(x=75, y=360, width=350, height=50)
 
-    pass_entry=Entry(login_frame,highlightthickness=5,relief=FLAT,font=("times new roman",15),show="•")
-    pass_entry.place(x=75,y=280,width=350,height=35)
-    
-    login_btn=Button(login_frame,command=login_check,text="Login",bg="blue",fg="white",bd=0,font=("perfect-dark-brk\\pdark.ttf",20),cursor="hand2")
-    login_btn.place(x=75,y=360,width=350,height=50)
+    noacc_lbl = Label(login_frame, text="Don't have an account? Sign up!", font=("Arial", 11), fg="grey", bg="black")
+    noacc_lbl.place(x=75, y=430)
 
-    noacc_lbl=Label(login_frame,text="Don't have an account ? signup and try again...",font=("goudy old style",12),fg="grey",bg="black")
-    noacc_lbl.place(x=75,y=430)
-
-    back_btn=Button(login_pg,text="🔙",font=("perfect-dark-brk\\pdark.ttf",70),fg="white",bg="black",cursor="hand2",command=logintols)
-    back_btn.place(x=0,y=0,width=70,height=70)
+    back_btn = Button(login_pg, text="< Back", font=("Impact", 20), fg="white", bg="black", cursor="hand2",
+                      command=login_pg.destroy)
+    back_btn.place(x=10, y=10, width=100, height=50)
 
     login_pg.mainloop()
 
 def open_signup():
+    sign_pg = Tk()
+    sign_pg.title("Mechflight - Sign Up")
+    sign_pg.geometry("1200x600")
+    try:
+        sign_pg.state('zoomed')
+    except Exception:
+        pass
 
-    global sign_pg
-    global uname_entry, password_entry, cpassword_entry, email_entry
+    try:
+        img2 = Image.open("lgbg.jpg")
+        photo = ImageTk.PhotoImage(img2)
+        img2_label = Label(sign_pg, image=photo)
+        img2_label.image = photo
+        img2_label.pack(fill="both", expand="yes")
+    except Exception:
+        sign_pg.configure(bg="black")
 
-    sign_pg=Tk()
-    sign_pg.title("Mechflight")
-    sign_pg.geometry("1200x600+0+0")
-    sign_pg.state('zoomed')
-    img2=Image.open("lgbg.jpg")
-    photo= ImageTk.PhotoImage(img2)
-    img2_label=Label(sign_pg, image=photo)
-    img2_label.image=photo
-    img2_label.pack(fill="both",expand="yes")
-
-    sign_frame= Frame(sign_pg, bg="black")
+    sign_frame = Frame(sign_pg, bg="black")
     frame_width = 500
-    frame_height = 620
-
-    screen_width = sign_pg.winfo_screenwidth()
-    screen_height = sign_pg.winfo_screenheight()
-
-    x = (screen_width // 2) - (frame_width // 2)
-    y = (screen_height // 2) - (frame_height // 2)
-
+    frame_height = 580
+    screen_width_tk = sign_pg.winfo_screenwidth()
+    screen_height_tk = sign_pg.winfo_screenheight()
+    x = (screen_width_tk // 2) - (frame_width // 2)
+    y = (screen_height_tk // 2) - (frame_height // 2)
     sign_frame.place(x=x, y=y, width=frame_width, height=frame_height)
 
-    caption=Label(sign_frame,text="Get Ready Warrior!!",font=("perfect-dark-brk\\pdark.ttf",35,"bold"),fg="white",bg="black")
-    caption.place(x=35,y=45)
+    caption = Label(sign_frame, text="Get Ready Warrior!!", font=("Impact", 30), fg="white", bg="black")
+    caption.place(x=35, y=30)
 
-    uname_lbl=Label(sign_frame,text="Username",font=("goudy old style",15,"bold"),fg="grey",bg="black")
-    uname_lbl.place(x=70,y=150)
-    uname_entry=Entry(sign_frame,highlightthickness=5,relief=FLAT,font=("times new roman",15))
-    uname_entry.place(x=75,y=180,width=350,height=35)
+    uname_lbl = Label(sign_frame, text="Username", font=("Arial", 12, "bold"), fg="grey", bg="black")
+    uname_lbl.place(x=70, y=110)
+    uname_entry = Entry(sign_frame, highlightthickness=2, relief=FLAT, font=("Arial", 13))
+    uname_entry.place(x=75, y=135, width=350, height=35)
 
-    password_lbl=Label(sign_frame,text="Password",font=("goudy old style",15,"bold"),fg="grey",bg="black")
-    password_lbl.place(x=70,y=250)
-    password_entry=Entry(sign_frame,highlightthickness=5,relief=FLAT,font=("times new roman",15),show="•")
-    password_entry.place(x=75,y=280,width=350,height=35)
+    password_lbl = Label(sign_frame, text="Password", font=("Arial", 12, "bold"), fg="grey", bg="black")
+    password_lbl.place(x=70, y=190)
+    password_entry = Entry(sign_frame, highlightthickness=2, relief=FLAT, font=("Arial", 13), show="•")
+    password_entry.place(x=75, y=215, width=350, height=35)
 
-    cpassword_lbl=Label(sign_frame,text="Confirm Password",font=("goudy old style",15,"bold"),fg="grey",bg="black")
-    cpassword_lbl.place(x=70,y=350)
-    cpassword_entry=Entry(sign_frame,highlightthickness=5,relief=FLAT,font=("times new roman",15),show="•")
-    cpassword_entry.place(x=75,y=380,width=350,height=35)
+    cpassword_lbl = Label(sign_frame, text="Confirm Password", font=("Arial", 12, "bold"), fg="grey", bg="black")
+    cpassword_lbl.place(x=70, y=270)
+    cpassword_entry = Entry(sign_frame, highlightthickness=2, relief=FLAT, font=("Arial", 13), show="•")
+    cpassword_entry.place(x=75, y=295, width=350, height=35)
 
-    email_lbl=Label(sign_frame,text="Email",font=("goudy old style",15,"bold"),fg="grey",bg="black")
-    email_lbl.place(x=70,y=450)
-    email_entry=Entry(sign_frame,highlightthickness=5,relief=FLAT,font=("times new roman",15))
-    email_entry.place(x=75,y=480,width=350,height=35)
+    email_lbl = Label(sign_frame, text="Email", font=("Arial", 12, "bold"), fg="grey", bg="black")
+    email_lbl.place(x=70, y=350)
+    email_entry = Entry(sign_frame, highlightthickness=2, relief=FLAT, font=("Arial", 13))
+    email_entry.place(x=75, y=375, width=350, height=35)
 
-    confirm_btn=Button(sign_frame,text="Confirm",bg="blue",fg="white",bd=0,font=("perfect-dark-brk\\pdark.ttf",20),cursor="hand2",command=signup_check)
-    confirm_btn.place(x=75,y=550,width=350,height=50)
+    confirm_btn = Button(sign_frame, text="Confirm", bg="blue", fg="white", bd=0, font=("Impact", 18), cursor="hand2",
+                         command=lambda: signup_check(uname_entry, password_entry, cpassword_entry, email_entry, sign_pg))
+    confirm_btn.place(x=75, y=450, width=350, height=50)
 
-    back_btn=Button(sign_pg,text="🔙",font=("perfect-dark-brk\\pdark.ttf",70),fg="white",bg="black",cursor="hand2",command=signuptols)
-    back_btn.place(x=0,y=0,width=70,height=70)
+    back_btn = Button(sign_pg, text="< Back", font=("Impact", 20), fg="white", bg="black", cursor="hand2",
+                      command=sign_pg.destroy)
+    back_btn.place(x=10, y=10, width=100, height=50)
 
     sign_pg.mainloop()
-    
-def ls():
-    global root
-    root= Tk()
-    root.title("Mechflight")
-    root.geometry("1200x600+0+0")
-    root.state('zoomed')
-    img1=Image.open("lgbg.jpg")
-    photo= ImageTk.PhotoImage(img1)
-    img1_label=Label(root, image=photo)
-    img1_label.image=photo
-    img1_label.pack(fill="both",expand="yes")
 
-    login_btn=Button(root,text="Login",font=("perfect-dark-brk\\pdark.ttf",20),fg="white",bg="black",cursor="hand2",command=lstologin)
-    login_btn.place(x=300,y=600,width=350,height=60)
-    signup_btn=Button(root,text="Sign Up",font=("perfect-dark-brk\\pdark.ttf",20),fg="white",bg="black",cursor="hand2",command=lstosignup)
-    signup_btn.place(x=700,y=600,width=350,height=60)
+def launch_auth_flow():
+    while not details:
+        root = Tk()
+        root.title("Mechflight - Welcome")
+        root.geometry("1200x600")
+        try:
+            root.state('zoomed')
+        except Exception:
+            pass
 
-    root.mainloop()
+        try:
+            img1 = Image.open("lgbg.jpg")
+            photo = ImageTk.PhotoImage(img1)
+            img1_label = Label(root, image=photo)
+            img1_label.image = photo
+            img1_label.pack(fill="both", expand="yes")
+        except Exception:
+            root.configure(bg="black")
 
-#MAIN SCREEN AND GAME
+        login_btn = Button(root, text="Login", font=("Impact", 20), fg="white", bg="black", cursor="hand2",
+                           command=lambda: [root.destroy(), open_login()])
+        login_btn.place(x=300, y=500, width=250, height=60)
 
-screen_width=1380
-screen_height=690
+        signup_btn = Button(root, text="Sign Up", font=("Impact", 20), fg="white", bg="black", cursor="hand2",
+                            command=lambda: [root.destroy(), open_signup()])
+        signup_btn.place(x=650, y=500, width=250, height=60)
 
-def text_single(s,x,y,c,f_size):
-    i=pygame.font.Font('ARCADE.TTF',f_size).render(s,True,(255,0,0))
-    c.blit(i,(x,y))
+        root.mainloop()
+        
+        # User closed main window without logging in/signing up
+        if not details:
+            return False
+    return True
 
-def button_draw(s,c,f_size,r,C,e=True):
-    b_text=pygame.font.Font('perfect-dark-brk\\pdark.ttf',f_size).render(s,True,C)
-    b_rec=b_text.get_rect()
-    b_rec.center=r.center
+# --- PYGAME HELPER FUNCTIONS ---
+
+def set_fullscreen_mode():
+    return pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREEN)
+
+def load_font(name, size):
+    try:
+        return pygame.font.Font(name, size)
+    except Exception:
+        return pygame.font.SysFont('arial', size)
+
+def text_single(s, x, y, c, f_size, color=(255, 0, 0)):
+    font = load_font('ARCADE.TTF', f_size)
+    i = font.render(s, True, color)
+    c.blit(i, (x, y))
+
+def is_button_clicked(rect, events):
+    for event in events:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if rect.collidepoint(event.pos):
+                return True
+    return False
+
+def is_mouse_hovering(rect):
+    return rect.collidepoint(pygame.mouse.get_pos())
+
+def button_draw(s, c, f_size, r, C, e=True, events=None):
+    font = load_font('perfect-dark-brk/pdark.ttf', f_size)
+    b_text = font.render(s, True, C)
+    b_rec = b_text.get_rect(center=r.center)
     if e:
-        if click_check(r):
-            pygame.draw.rect(c,'dark gray',r,0,5)
+        if is_mouse_hovering(r):
+            pygame.draw.rect(c, (80, 80, 80), r, 0, 5)
         else:
-            pygame.draw.rect(c,'black',r,0,5)
-        pygame.draw.rect(c,'white',r,1,5)
-        c.blit(b_text,b_rec)
+            pygame.draw.rect(c, (0, 0, 0), r, 0, 5)
+        pygame.draw.rect(c, (255, 255, 255), r, 1, 5)
+        c.blit(b_text, b_rec)
 
-def click_check(r):
-    m_pos=pygame.mouse.get_pos()
-    if pygame.mouse.get_pressed()[0] and r.collidepoint(m_pos):
-        return True
-    else:
-        return False
+    if e and events is not None:
+        return is_button_clicked(r, events)
+    return False
+
+# --- PYGAME SCREENS ---
 
 def player_profile():
-    
-    screen=pygame.display.set_mode((screen_width,screen_height))
-    pygame.display.set_caption('Mechflight')
-    clock=pygame.time.Clock()
+    screen = set_fullscreen_mode()
+    pygame.display.set_caption('Mechflight - Profile')
+    clock = pygame.time.Clock()
 
-    profileimg=pygame.transform.scale(pygame.image.load('profile photo1.png'),(200,200))
-    profile_rec=profileimg.get_rect()
-    profile_rec.center=(screen_width/4,screen_height/2)
+    profileimg = pygame.transform.scale(pygame.image.load('profile photo1.png'), (220, 220))
+    profile_rec = profileimg.get_rect(center=(screen_width / 4, screen_height / 2))
 
-    backimg=pygame.transform.scale(pygame.image.load('back1.jpeg'),(50,50))
-    b_rec=backimg.get_rect()
-    back=pygame.rect.Rect(0,0,100,50)
-    back.bottomleft=(0,screen_height)
-    b_rec.midleft=back.midright
-    
-    run=True
+    backimg = pygame.transform.scale(pygame.image.load('back1.jpeg'), (50, 50))
+    b_rec = backimg.get_rect()
+    back = pygame.rect.Rect(0, 0, 100, 50)
+    back.bottomleft = (20, screen_height - 20)
+    b_rec.midleft = back.midright
+
+    run = True
     while run:
-        screen.fill((10,20,30))
-        for i in pygame.event.get():
-            if i.type==pygame.QUIT:
-                run=False
+        events = pygame.event.get()
+        for event in events:
+            if event.type == pygame.QUIT:
+                return "quit"
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return "home"
 
-        pygame.draw.rect(screen,(20,30,40),(screen_width/2 -50,0,screen_width/2,screen_height),0,10)
-        pygame.draw.rect(screen,'white',(screen_width/2 -50,0,screen_width/2,screen_height),5,10)
-        screen.blit(profileimg,profile_rec)
-        
-        Y=50
-        for i in details:
-            pygame.draw.rect(screen,(50,60,70),(screen_width/2 -40,Y,screen_width/2-10,100))
-            pygame.draw.rect(screen,(80,90,100),(screen_width/2 -40,Y,screen_width/2-10,100),10,9)
-            text=i+': '+details[i]
-            text_single(text,screen_width/2,Y+15,screen,30)
-            Y+=75
+        screen.fill((10, 20, 30))
+        pygame.draw.rect(screen, (20, 30, 40), (screen_width / 2 - 50, 0, screen_width / 2, screen_height), 0, 10)
+        pygame.draw.rect(screen, (255, 255, 255), (screen_width / 2 - 50, 0, screen_width / 2, screen_height), 5, 10)
+        screen.blit(profileimg, profile_rec)
 
-        button_draw('BACK',screen,20, back, 'grey')
-        screen.blit(backimg,b_rec)
+        Y = 80
+        for key in details:
+            pygame.draw.rect(screen, (50, 60, 70), (screen_width / 2 - 30, Y, screen_width / 2 - 40, 70), 0, 10)
+            pygame.draw.rect(screen, (80, 90, 100), (screen_width / 2 - 30, Y, screen_width / 2 - 40, 70), 3, 10)
+            val = "••••••••" if key == "PASS" else str(details[key])
+            text = f"{key}: {val}"
+            text_single(text, screen_width / 2 - 10, Y + 20, screen, 30, (255, 255, 255))
+            Y += 95
 
-        if click_check(back):
-            open_home()
-            run=False
-            
+        if button_draw('BACK', screen, 22, back, 'grey', True, events):
+            return "home"
+        screen.blit(backimg, b_rec)
+
         pygame.display.flip()
         clock.tick(60)
+    return "home"
 
 def loading_screen():
-    screen=pygame.display.set_mode((screen_width,screen_height))
-    pygame.display.set_caption('Mechflight')
-    clock=pygame.time.Clock()
+    screen = set_fullscreen_mode()
+    pygame.display.set_caption('Mechflight - Loading')
+    clock = pygame.time.Clock()
 
-    t=0
-    
-    w1=pygame.transform.scale(pygame.image.load("sprite1.png"),(50,50))
-    w2=pygame.transform.scale(pygame.image.load("sprite2.png"),(50,50))
-    w3=pygame.transform.scale(pygame.image.load("sprite3.png"),(50,50))
-    w4=pygame.transform.scale(pygame.image.load("sprite4.png"),(50,50))
-    l= [w1,w2,w3,w4]
-    
-    rec=pygame.rect.Rect(screen_width/4,screen_height/2,25,25)
-    rg=pygame.rect.Rect(screen_width/4,screen_height/2 + 50,screen_width/2,2)
-    speed=4
-    img=l[0]
-    run=True
+    t = 0
+    w1 = pygame.transform.scale(pygame.image.load("sprite1.png"), (60, 60))
+    w2 = pygame.transform.scale(pygame.image.load("sprite2.png"), (60, 60))
+    w3 = pygame.transform.scale(pygame.image.load("sprite3.png"), (60, 60))
+    w4 = pygame.transform.scale(pygame.image.load("sprite4.png"), (60, 60))
+    walk_sprites = [w1, w2, w3, w4]
+
+    rec = pygame.rect.Rect(screen_width / 4, screen_height / 2, 30, 30)
+    rg = pygame.rect.Rect(screen_width / 4, screen_height / 2 + 60, screen_width / 2, 3)
+    speed = 6
+    img_sprite = walk_sprites[0]
+
+    run = True
     while run:
-        screen.fill((10,20,30))
-        for i in pygame.event.get():
-            if i.type==pygame.QUIT:
-                run=False
+        events = pygame.event.get()
+        for event in events:
+            if event.type == pygame.QUIT:
+                return "quit"
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return "home"
 
-        t+=2
-        if t==20:
-            img=l[1]
-                 
-        if t==40:
-            img=l[2]
-            
-        if t==60:
-            img=l[3]
-            t=0
-            
-        rec.x+=speed
-        
-        if rec.x+50>3*screen_width/4:
-            game()
-            run=False
-            
-        pygame.draw.rect(screen,'white',rg)
-        screen.blit(img,rec)
-        
+        t += 2
+        if t == 20:
+            img_sprite = walk_sprites[1]
+        elif t == 40:
+            img_sprite = walk_sprites[2]
+        elif t == 60:
+            img_sprite = walk_sprites[3]
+            t = 0
+
+        rec.x += speed
+
+        if rec.x + 60 > 3 * screen_width / 4:
+            return "game"
+
+        screen.fill((10, 20, 30))
+        pygame.draw.rect(screen, (255, 255, 255), rg)
+        screen.blit(img_sprite, rec)
+
         pygame.display.flip()
         clock.tick(60)
-    
+    return "game"
 
 def game():
-
-    restart = False
-    run = True
-
-    screen=pygame.display.set_mode((screen_width,screen_height))
+    screen = set_fullscreen_mode()
     pygame.display.set_caption('Mechflight')
-    clock=pygame.time.Clock()
-    fps=60
-    g_limit=screen_height-90
-    pd={'roll':0,'roll1': 0,'obs':5,'p_change':2,'dead':False,'times':0,'e0':0,'jump':False,'draw':True,'score':0,'sc_d':0,'hs':0}
-    font = pygame.font.Font('ARCADE_N.TTF', 32)
+    clock = pygame.time.Clock()
+    fps = 60
+    g_limit = screen_height - 110
 
-    #SCORE CALCULATION
+    pd = {'roll': 0, 'roll1': 0, 'obs': 6, 'p_change': 7, 'dead': False, 'times': 0, 'e0': 0, 'jump': False,
+          'draw': True, 'score': 0, 'sc_d': 0, 'hs': 0}
+    font = load_font('ARCADE_N.TTF', 36)
 
-    def scores():
-        st='SCORE:'+str(pd['score'])
-        text = font.render(st, True, 'white', 'black')
-        textRect = text.get_rect()
-        textRect.topleft=(0,0)
+    def draw_score():
+        st = f'SCORE:{pd["score"]}'
+        text = font.render(st, True, (255, 255, 255), (0, 0, 0))
+        textRect = text.get_rect(topleft=(20, 20))
         screen.blit(text, textRect)
 
-    def highscore():
-        mycon1=db.connect(host='localhost',user='root',password='987654321',database='mechflight')
-        c=mycon1.cursor()
-        c.execute('update scores set highscore={0} where id="{1}" and highscore < {0};'.format(pd['score'],details['USER ID']))
-        mycon1.commit()
-        mycon1.close()
-    def hs_cal():
-        mycon=db.connect(host='localhost',user='root',password='987654321',database='mechflight')
-        c=mycon.cursor()
-        c.execute('select * from scores where id="{}";'.format(details['USER ID'],))
-        l=c.fetchall()
-        pd['hs']=l[0][2]
-        mycon.close()
-
-    #BG MAPPING
-    back = pygame.transform.scale(pygame.image.load("back6.jpg"),(screen_width,g_limit))
-    ground = pygame.transform.scale(pygame.image.load("ground.jpg"),(screen_width,90))
-    ground_width = back.get_width()
-    back_height = back.get_height()
+    # BG MAPPING (Full Screen Dynamic Scaling)
+    back = pygame.transform.scale(pygame.image.load("back6.jpg"), (screen_width, g_limit))
+    ground = pygame.transform.scale(pygame.image.load("ground.jpg"), (screen_width, 110))
     back_width = back.get_width()
-    tiles = math.ceil(screen_width/back_width ) + 3
-    tiles1 = math.ceil(screen_width/ground_width) + 3
+    ground_width = ground.get_width()
+    tiles = math.ceil(screen_width / back_width) + 3
+    tiles1 = math.ceil(screen_width / ground_width) + 3
 
     def bg_move():
-        for i in range(0, tiles):
-            screen.blit(back,(i *back_width - pd['roll1'] ,0))
-        for j in range(0,tiles1):
-            screen.blit(ground,(j*ground_width - pd['roll'],g_limit))
-        if not pd['dead']:
-            pd['roll1'] += 5//2
-            pd['roll'] += 5
+        for i in range(tiles):
+            screen.blit(back, (i * back_width - pd['roll1'], 0))
+        for j in range(tiles1):
+            screen.blit(ground, (j * ground_width - pd['roll'], g_limit))
 
-            if pd['roll1'] > back_width  and pd['roll'] > ground_width :
-                pd['roll'] = 0
+        if not pd['dead']:
+            pd['roll1'] += 3
+            pd['roll'] += 6
+
+            if pd['roll1'] >= back_width:
                 pd['roll1'] = 0
+            if pd['roll'] >= ground_width:
+                pd['roll'] = 0
 
-        
-    #PLAYER MOVEMENT
+    # PLAYER SPRITES & RECT
+    p_x = 80
+    p_y = g_limit - 85
+    p_rec = pygame.Rect(p_x + 10, p_y + 10, 65, 65)
 
-    p_x=50
-    p_y=g_limit-75
-    p_rec=pygame.Rect(p_x+10, p_y+10, 55, 55)
-
-    w1=pygame.transform.scale(pygame.image.load("sprite1.png"),(75,80))
-    w2=pygame.transform.scale(pygame.image.load("sprite2.png"),(75,80))
-    w3=pygame.transform.scale(pygame.image.load("sprite3.png"),(75,80))
-    w4=pygame.transform.scale(pygame.image.load("sprite4.png"),(75,80))
-    f0=pygame.transform.scale(pygame.image.load("sprite5.png"),(80,120))
-    f1=pygame.transform.scale(pygame.image.load("sprite6.png"),(80,120))
-    f2=pygame.transform.scale(pygame.image.load("sprite7.png"),(80,120))
-    f3=pygame.transform.scale(pygame.image.load("sprite8.png"),(80,120))
-    e1=pygame.transform.scale(pygame.image.load("explosion1.png"),(80,80))
-    e2=pygame.transform.scale(pygame.image.load("explosion2.png"),(80,80))
-    walk= [w1,w2,w3,w4]
-    fly=[f0,f2,f1,f3]
-    e=[e1,e2]
-
-    def p_move():
-        keys=pygame.key.get_pressed()
-        if not pd['dead']:
-            if p_rec.y==p_y:
-                pd['jump']=False
-            if keys[pygame.K_SPACE] and p_rec.y>50:
-                pd['jump']=True
-                p_rec.y-=pd['p_change']
-            elif p_rec.y<p_y:
-                p_rec.y+=pd['p_change']
-
-            if p_rec.x<screen_width//4:
-                p_rec.x+=pd['p_change']
-            for i in obs:
-                if obs_hitbox[obs.index(i)].colliderect(p_rec):
-                    pd['dead']=True
-                
-        if pd['draw']  :
-            screen.blit(img,p_rec)
-
-    # OBSTACLES
-    ob_x = screen_width
-    ob_y = random.randint(200, g_limit - 40)
-    img = pygame.image.load("obstacles.png").convert_alpha()
-    img = pygame.transform.rotate(img, 90)
-    ob_w = 120
-    ob_h = 60
-    ob_img = pygame.transform.scale(img, (ob_w, ob_h))
+    w1 = pygame.transform.scale(pygame.image.load("sprite1.png"), (85, 90))
+    w2 = pygame.transform.scale(pygame.image.load("sprite2.png"), (85, 90))
+    w3 = pygame.transform.scale(pygame.image.load("sprite3.png"), (85, 90))
+    w4 = pygame.transform.scale(pygame.image.load("sprite4.png"), (85, 90))
+    f0 = pygame.transform.scale(pygame.image.load("sprite5.png"), (90, 130))
+    f1 = pygame.transform.scale(pygame.image.load("sprite6.png"), (90, 130))
+    f2 = pygame.transform.scale(pygame.image.load("sprite7.png"), (90, 130))
+    f3 = pygame.transform.scale(pygame.image.load("sprite8.png"), (90, 130))
+    e1 = pygame.transform.scale(pygame.image.load("explosion1.png"), (90, 90))
+    e2 = pygame.transform.scale(pygame.image.load("explosion2.png"), (90, 90))
     
-    #COORDINATES
-    cod=[]
-    r=math.ceil(screen_width//ob_w)
-    c=math.ceil((g_limit-50)//ob_h)
-    for i in range(0,r):
-        for j in range(0, c):
-            y_pos = j * ob_h + 50
-            if y_pos > g_limit - ob_h:
-                y_pos = g_limit - ob_h
-            cod.append((i * ob_w + screen_width, y_pos))
+    walk_anim = [w1, w2, w3, w4]
+    fly_anim = [f0, f2, f1, f3]
+    expl_anim = [e1, e2]
+    current_p_img = walk_anim[0]
 
-    #RECTANGLES
-    n=5
+    # OBSTACLES SPACING
+    img_ob = pygame.image.load("obstacles.png").convert_alpha()
+    img_ob = pygame.transform.rotate(img_ob, 90)
+    ob_w = 130
+    ob_h = 65
+    ob_img = pygame.transform.scale(img_ob, (ob_w, ob_h))
+
+    n = 5
     obs = []
     obs_hitbox = []
 
     for i in range(n):
-        rect = pygame.Rect(ob_x, ob_y, ob_w, ob_h)
+        spawn_x = screen_width + i * 360 + random.randint(0, 100)
+        spawn_y = random.randint(120, g_limit - ob_h - 10)
+        rect = pygame.Rect(spawn_x, spawn_y, ob_w, ob_h)
+        hitbox = pygame.Rect(spawn_x + 10, spawn_y + 10, ob_w - 20, ob_h - 20)
         obs.append(rect)
-
-        # smaller hitbox inside
-        hitbox = pygame.Rect(ob_x+10, ob_y+10, ob_w-20, ob_h-20)
         obs_hitbox.append(hitbox)
-    #DRAWING OBSTACLES
-    def obstacles():
+
+    def p_move():
+        nonlocal current_p_img
+        keys = pygame.key.get_pressed()
+        if not pd['dead']:
+            if p_rec.y >= p_y:
+                p_rec.y = p_y
+                pd['jump'] = False
+
+            if keys[pygame.K_SPACE] and p_rec.y > 50:
+                pd['jump'] = True
+                p_rec.y -= pd['p_change']
+            elif p_rec.y < p_y:
+                p_rec.y += 6  # gravity fall
+
+            if p_rec.x < screen_width // 4:
+                p_rec.x += 2
+
+            for i in range(n):
+                if obs_hitbox[i].colliderect(p_rec):
+                    pd['dead'] = True
+
+        if pd['draw']:
+            screen.blit(current_p_img, (p_rec.x - 10, p_rec.y - 10))
+
+    def update_obstacles():
         if not pd['dead']:
             for i in range(n):
+                obs[i].x -= pd['obs']
+                obs_hitbox[i].x -= pd['obs']
 
-                # Move obstacle
-                if obs[i].x + ob_w > 0:
-                    obs[i].x -= pd['obs']
-                    obs_hitbox[i].x -= pd['obs']
-                else:
+                if obs[i].right < 0:
+                    max_x = max(o.x for o in obs)
+                    new_x = max(screen_width, max_x + 320 + random.randint(0, 100))
                     r = random.random()
-
-                    # 🟥 Ground obstacle (forces jump)
                     if r < 0.4:
                         y = g_limit - ob_h
-
-                    # 🟨 Mid air obstacle
                     elif r < 0.75:
-                        y = random.randint(150, g_limit - 200)
-
-                    # 🟦 High air obstacle (forces flying)
+                        y = random.randint(180, g_limit - 200)
                     else:
-                        y = random.randint(50, 150)
+                        y = random.randint(60, 180)
 
-                    obs[i].topleft = (screen_width, y)
-                    obs_hitbox[i].topleft = (screen_width+10, y+10)
+                    obs[i].topleft = (new_x, y)
+                    obs_hitbox[i].topleft = (new_x + 10, y + 10)
 
-                # Draw obstacle
                 screen.blit(ob_img, obs[i])
-        
-    #RETRY SCREEN
-    re_rect=pygame.rect.Rect(0,0,400,400)
-    re_rect.center=(screen_width/2,screen_height/2)
+        else:
+            for i in range(n):
+                screen.blit(ob_img, obs[i])
 
-    text=font.render('Try again',True,'white')
-    t_box=text.get_rect()
-    t_box.center=(screen_width/2,screen_height/2-100)
+    # RETRY MODAL RECTS (FULL SCREEN CENTERED)
+    re_rect = pygame.rect.Rect(0, 0, 480, 340)
+    re_rect.center = (screen_width / 2, screen_height / 2)
+    retry_btn_rect = pygame.rect.Rect(screen_width / 2 - 90, screen_height / 2 + 80, 180, 55)
+    close_btn_rect = pygame.rect.Rect(0, 0, 45, 45)
+    close_btn_rect.topright = re_rect.topright
 
-    retry=pygame.rect.Rect(screen_width/2 - 75,screen_height/2+100,150,50)
-    close=pygame.rect.Rect(0,0,40,40)
-    close.topright=re_rect.topright
+    retry_text = font.render('Try again', True, (255, 255, 255))
+    retry_text_rect = retry_text.get_rect(center=(screen_width / 2, screen_height / 2 - 80))
 
-    img=walk[0]
     run = True
     while run:
+        events = pygame.event.get()
+        for event in events:
+            if event.type == pygame.QUIT:
+                return "quit"
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return "home"
+
         clock.tick(fps)
-        pd['times']+=2
-        
+        pd['times'] += 2
+
         if not pd['dead']:
-            if pd['jump']:
-                l=fly
-            
-            else:
-                l=walk
-        
-            if pd['times']==20:
-                img=l[1]
-                pd['score']+=1
-                
-                
-                
-            if pd['times']==40:
-                img=l[2]
-                pd['score']+=1
-                
-                
-            if pd['times']==60:
-                img=l[3]
-                pd['score']+=1
-                pd['times']=0
-                
+            anim_list = fly_anim if pd['jump'] else walk_anim
+            if pd['times'] == 20:
+                current_p_img = anim_list[1]
+                pd['score'] += 1
+            elif pd['times'] == 40:
+                current_p_img = anim_list[2]
+                pd['score'] += 1
+            elif pd['times'] >= 60:
+                current_p_img = anim_list[3]
+                pd['score'] += 1
+                pd['times'] = 0
         else:
-            if pd['e0']<3:
-                if pd['times']==30:
-                    img=e[1]
-                if pd['times']==60:
-                    img=e[0]
-                    pd['e0']+=1
-                    pd['times']=0
+            if pd['e0'] < 3:
+                if pd['times'] == 30:
+                    current_p_img = expl_anim[1]
+                elif pd['times'] >= 60:
+                    current_p_img = expl_anim[0]
+                    pd['e0'] += 1
+                    pd['times'] = 0
             else:
-                img=walk[0]    
-                pd['draw']=False
-                if pd['sc_d']==0:
-                    highscore()
-                    pd['sc_d']+=1
-                
-        
-        screen.fill('lightgrey')
-        for event in pygame.event.get():
-            if event.type==pygame.QUIT:
-                run=False
-        
-        #BG MOVEMENT
+                current_p_img = walk_anim[0]
+                pd['draw'] = False
+                if pd['sc_d'] == 0:
+                    user_id = details.get('USER ID', '')
+                    save_score_to_db(user_id, pd['score'])
+                    pd['hs'] = max(pd['score'], fetch_highscore_db(user_id))
+                    pd['sc_d'] += 1
+
+        screen.fill((211, 211, 211))
+
         bg_move()
-
-        #PLAYER AND OBSTACLE MOVEMENT
-        obstacles()
+        update_obstacles()
         p_move()
+        draw_score()
 
-        #SCORES
-        scores()
         if not pd['draw']:
-            pygame.draw.rect(screen,'black',re_rect)
-            screen.blit(text,t_box)
-            hs_cal()
-            hss='HIGHSCORE:'+str(pd['hs'])
-            text_single(hss,screen_width/2 - 100,screen_height/2,screen,32)
-            button_draw('RETRY',screen,32,retry,'white')
-            button_draw('X',screen,32,close,'white')
+            pygame.draw.rect(screen, (0, 0, 0), re_rect, 0, 12)
+            pygame.draw.rect(screen, (255, 255, 255), re_rect, 3, 12)
+            screen.blit(retry_text, retry_text_rect)
 
-            if click_check(retry):
-                pygame.time.delay(200)
-                restart = True
-                run = False
+            hss = f'HIGHSCORE: {pd["hs"]}'
+            text_single(hss, screen_width / 2 - 140, screen_height / 2, screen, 36, (255, 255, 0))
 
-            if click_check(close):
-                open_home()
-                run=False
-        pygame.draw.rect(screen, "red", p_rec, 2)
-        for i in range(n):
-            pygame.draw.rect(screen, "green", obs_hitbox[i], 2)
+            if button_draw('RETRY', screen, 30, retry_btn_rect, 'white', True, events):
+                return "game"
+            if button_draw('X', screen, 30, close_btn_rect, 'white', True, events):
+                return "home"
 
         pygame.display.flip()
-    if restart:
-        game()
-    
+
+    return "home"
 
 def open_home():
     global Text_box_complete
-    
-    #SCREEN SETTINGS
-    screen=pygame.display.set_mode((screen_width,screen_height))
-    pygame.display.set_caption('Mechflight')
-    clock=pygame.time.Clock()
 
-    #HEADING
-    font = pygame.font.Font('ARCADE_N.TTF', 75)
-    hd=font.render('MECHFLIGHT',True,'white')
-    h_rec=hd.get_rect()
-    h_rec.center=(screen_width/2,screen_height/2)
-    h_speed=2
-    up=True
+    screen = set_fullscreen_mode()
+    pygame.display.set_caption('Mechflight - Home')
+    clock = pygame.time.Clock()
 
-    #PROFILE BOX
-    nme=details['NAME']
-    profileimg=pygame.transform.scale(pygame.image.load('profile photo1.png'),(50,50))
-    profile_rec=profileimg.get_rect()
-    profile_rec.topleft=(screen_width/4,25)
+    font = load_font('ARCADE_N.TTF', 85)
+    hd = font.render('MECHFLIGHT', True, (255, 255, 255))
+    h_rec = hd.get_rect(center=(screen_width / 2, screen_height / 2 - 60))
+    h_speed = 1
+    up = True
 
-    #BUTTONS INIIALISATION
-    Player_profile=pygame.rect.Rect(25,25,screen_width/4,50)
-    Start=pygame.rect.Rect(0,0,250,100)
-    Start.center=(screen_width/2,3*screen_height/4 + 100)
+    nme = details.get('NAME', 'Player')
+    profileimg = pygame.transform.scale(pygame.image.load('profile photo1.png'), (60, 60))
+    profile_rec = profileimg.get_rect(topleft=(screen_width / 4, 30))
 
-    #MESSAGE BOX SETTINGS
-    Text_box=pygame.rect.Rect(0,500,screen_width,190)
-    Next_enabled=True
-    Next=pygame.rect.Rect(screen_width-100,screen_height-60,100,50)
-    new_presses=True
-    j=0
+    Player_profile = pygame.rect.Rect(30, 30, screen_width / 4, 60)
+    Start = pygame.rect.Rect(0, 0, 280, 90)
+    Start.center = (screen_width / 2, 3 * screen_height / 4 + 40)
 
-    #SCRIPT LOADING
-    c=0
-    f=open('Script.txt','r')
-    l=f.readlines()
-    f.close()
-    
-    for i in range(0,len(l)-1):
-        l[i]=l[i][0:len(l[i])-1]
-    D=l[0][0:len(l[0])-1]
+    Text_box = pygame.rect.Rect(0, screen_height - 200, screen_width, 200)
+    Next = pygame.rect.Rect(screen_width - 140, screen_height - 70, 120, 55)
+    j = 0
+    script_idx = 0
 
-    #MAIN SCREEN LOOP
-    run=True
+    script_lines = []
+    try:
+        with open('Script.txt', 'r') as f:
+            script_lines = [line.strip() for line in f if line.strip()]
+    except Exception:
+        script_lines = ["Hello! Welcome to Mechflight!", "Created by Class 12 students.", "Thank You for downloading!"]
+
+    if not script_lines:
+        script_lines = ["Welcome to Mechflight!"]
+
+    D = script_lines[0]
+
+    run = True
     while run:
-        screen.fill((20,30,40))
-        for i in pygame.event.get():
-            if i.type==pygame.QUIT:
-                run=False
-        #MESSAGE BOX DRAWING
-        if D!=l[len(l)-1] and not Text_box_complete:
-            pygame.draw.rect(screen,'black',Text_box)
-            if click_check(Next):
-                D=l[c]
-                j=0
-            #DISPLAYING TEXT
-            text_single(D[0:j],40,3*screen_height/4 + 20,screen,40)
-            if j<len(D):
-                j+=1
+        events = pygame.event.get()
+        for event in events:
+            if event.type == pygame.QUIT:
+                return "quit"
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return "quit"
 
-        else:
-            Next_enabled=False
-            Text_box_complete=True
-            button_draw(nme,screen,30,Player_profile,(255,215,0))
-            screen.blit(profileimg,profile_rec)
-            button_draw('Start',screen,40, Start,(255,215,0))
-            if h_rec.y>250 and up:
-                h_rec.y-=h_speed
-            else:
-                up=False
-                if h_rec.y<350:
-                    h_rec.y+=h_speed
+        screen.fill((20, 30, 40))
+
+        if not Text_box_complete and script_idx < len(script_lines):
+            pygame.draw.rect(screen, (0, 0, 0), Text_box)
+            pygame.draw.rect(screen, (255, 255, 255), Text_box, 2)
+            
+            # Display typewriter text
+            text_single(D[0:j], 50, screen_height - 150, screen, 38, (255, 255, 255))
+            if j < len(D):
+                j += 1
+
+            if button_draw('Next', screen, 26, Next, (255, 215, 0), True, events):
+                script_idx += 1
+                if script_idx < len(script_lines):
+                    D = script_lines[script_idx]
+                    j = 0
                 else:
-                    up=True
-            screen.blit(hd,h_rec)
+                    Text_box_complete = True
+        else:
+            Text_box_complete = True
 
-        
-        #CONVERTING NEXT BUTTON INTO A TOGGLE BUTTON
-        if pygame.mouse.get_pressed()[0] and new_presses:
-            new_presses=False
-            if click_check(Next):
-                if c<len(l)-1:
-                    c+=1
-        if not pygame.mouse.get_pressed()[0] and not new_presses:
-            new_presses=True
-        #Next BUTTON DRAWING
-        button_draw('Next',screen,30,Next,(255,215,0),Next_enabled)
-        
-        #CHECKING BUTTON CLICKS
-        if click_check(Player_profile):
-            player_profile()
-            run=False
+            if button_draw(nme, screen, 28, Player_profile, (255, 215, 0), True, events):
+                return "profile"
+            screen.blit(profileimg, profile_rec)
 
-        if click_check(Start):
-            loading_screen()
-            run=False
+            if button_draw('Start', screen, 40, Start, (255, 215, 0), True, events):
+                return "loading"
 
-        #UPDATING THE SCREEN
+            # Title float animation
+            if h_rec.y > screen_height / 2 - 100 and up:
+                h_rec.y -= h_speed
+            else:
+                up = False
+                if h_rec.y < screen_height / 2 - 20:
+                    h_rec.y += h_speed
+                else:
+                    up = True
+            screen.blit(hd, h_rec)
+
         pygame.display.flip()
         clock.tick(60)
-    
 
-#GAME LOOP
+    return "quit"
 
-ls()
-pygame.quit()
+# --- MAIN RUNNER ---
+
+def main():
+    if not launch_auth_flow():
+        print("User exited login/signup.")
+        return
+
+    current_screen = "home"
+    while current_screen != "quit":
+        if current_screen == "home":
+            current_screen = open_home()
+        elif current_screen == "profile":
+            current_screen = player_profile()
+        elif current_screen == "loading":
+            current_screen = loading_screen()
+        elif current_screen == "game":
+            current_screen = game()
+        else:
+            break
+
+    pygame.quit()
+
+if __name__ == "__main__":
+    main()
 
