@@ -1,14 +1,27 @@
-# Byte-compiled files
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
 *.class
 
-# Local user binaries & temp code runners
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local player data and temporary files
 LG.dat
 tempCodeRunnerFile.py
+*.log
 
-# System files
-.DS_Store
-Thumbs.db
+# Local configuration / secrets
+.env
+.env.*
+!.env.example
+config.local.*
+secrets.*
+
+# Editor and operating-system files
 .vscode/
 .idea/
+.DS_Store
+Thumbs.db
