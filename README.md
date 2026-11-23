@@ -28,7 +28,7 @@
 
 Mechflight is a side-scrolling survival game where flight is all about timing. Hold your jetpack to rise, release to descend, and navigate an increasingly challenging course.
 
-> **Screenshots coming soon** — add a few gameplay captures here to give visitors an instant look at the game.
+
 
 ## 🚀 Features
 
