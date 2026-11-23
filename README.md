@@ -1,112 +1,123 @@
-# 🛩️ Mechflight — 2D Side-Scrolling Action Game
+# Mechflight
 
-![Python Version](https://img.shields.io/badge/Python-3.8%2B-blue?style=for-the-badge&logo=python&logoColor=white)
-![Pygame](https://img.shields.io/badge/Pygame-2.5%2B-green?style=for-the-badge&logo=python&logoColor=white)
-![MySQL](https://img.shields.io/badge/MySQL-8.0%2B-orange?style=for-the-badge&logo=mysql&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-brightgreen?style=for-the-badge)
+A 2D side-scrolling arcade runner built with **Python**, **Pygame**, and **Tkinter**. Pilot a mech through an obstacle-filled course, use the jetpack to stay airborne, and try to beat your high score.
 
-**Mechflight** is a full-featured, 2D side-scrolling action-runner game built in Python. It combines real-time sprite animation physics, adaptive Chrome-Dino style difficulty scaling, dual-layer user authentication, and high-score database persistence.
+<p align="center">
+  <strong>Python · Pygame · Tkinter · MySQL (optional score storage)</strong>
+</p>
 
----
+## Features
 
-## 🌟 Key Features
+- Full-screen, side-scrolling gameplay
+- Jetpack-style flight with gravity
+- Animated mech sprites and explosion effects
+- Increasing difficulty as the run progresses
+- Login and registration screens
+- Local player data and high-score tracking
+- Optional MySQL-backed score persistence; the game can run without a reachable database
 
-- **🎮 Smooth Full-Screen Gameplay:** Dynamically adapts to your monitor resolution with responsive UI scaling.
-- **⚡ Adaptive Difficulty Scaling:** Gradually accelerates obstacle speed and world scrolling as your score rises, while maintaining true parallax depth proportions.
-- **🔐 Dual-Layer Authentication & Persistence:** Single-window Tkinter GUI interface backing local binary storage (pickle) and MySQL database persistence for user scores.
-- **💥 Collision Physics & Animations:** Custom AABB hitbox detection with sprite animation state switching (ground walking vs. airborne jetpack flight and explosion VFX).
-- **🏗️ Non-Recursive State Machine:** Engineered with an O(1) space complexity state loop that prevents call stack recursion and memory leaks.
-- **🚀 Decoupled Render Loop & I/O:** Decouples heavy database network calls from the 60 FPS Pygame render pipeline to eliminate stutters.
+## Gameplay
 
----
+| Action | Control |
+| --- | --- |
+| Fly upward | Hold <kbd>Space</kbd> |
+| Descend | Release <kbd>Space</kbd> |
+| Navigate menus | Mouse |
+| Exit / return | <kbd>Esc</kbd> |
 
-## 🛠️ Tech Stack
+## Getting started
 
-| Component | Technology / Library |
-| :--- | :--- |
-| **Language** | Python 3.8+ |
-| **Engine / Graphics** | Pygame 2.x (pygame.display, pygame.font, pygame.image, pygame.event) |
-| **GUI Framework** | Tkinter (Tk, Frame, Label, Button, Entry, messagebox) |
-| **Image Processing** | Pillow (PIL.Image, PIL.ImageTk) |
-| **Database** | MySQL Server 8.0+ (mysql.connector) |
-| **Local Serialization** | Python pickle (binary file LG.dat) |
+### Requirements
 
----
+- Python 3.8 or newer
+- pip
+- MySQL Server only if you want to use the database score feature
 
-## ⚙️ Installation & Setup
+### 1. Clone the project
 
-### Prerequisites
-- **Python 3.8+** installed
-- **MySQL Server** installed and running on localhost (default port 3306)
-
-### 1. Clone Repository
-`ash
+```bash
 git clone https://github.com/vishtodev/mechflight.git
 cd mechflight
-`
+```
 
-### 2. Install Dependencies
-`ash
+### 2. Create an environment
+
+Windows:
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+macOS / Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
+python -m pip install --upgrade pip
 pip install -r requirements.txt
-`
+```
 
-### 3. Database Setup (Automatic / Manual)
-* The game automatically attempts to connect to MySQL on localhost with user 
-oot and password 987654321.
-* If the database mechflight does not exist, the game auto-creates the schema and scores table.
-* *Note:* If MySQL is unreachable, Mechflight will continue running seamlessly in standalone offline mode.
+### 4. Run
 
----
+```bash
+python main.py
+```
 
-## 🕹️ Controls & How to Play
+Run the game from the repository root so that its image, font, and data assets can be found.
 
-| Action | Control Key / Mouse |
-| :--- | :--- |
-| **Fly Upward (Jetpack)** | Hold SPACE |
-| **Descend (Gravity)** | Release SPACE |
-| **Menu Navigation** | Mouse Click |
-| **Return to Home / Quit** | ESC Key |
+## Project layout
 
----
-
-## 📂 Project Structure
-
-`	ext
+```text
 mechflight/
-│
-├── main.py                  # Main game engine, auth flow & state machine
-├── Script.txt               # Dialogue storyteller script
-├── LG.dat                   # Local user credentials (binary)
-├── requirements.txt         # Project dependency manifest
-├── README.md                # Comprehensive project documentation
-├── .gitignore               # Git untracked files specification
-│
-├── ARCADE.TTF               # Arcade font asset
-├── ARCADE_N.TTF             # Arcade digital font asset
-├── perfect-dark-brk/        # Perfect Dark font asset package
-│
-├── back1.jpeg               # Back button icon
-├── back6.jpg                # Sky parallax background surface
-├── ground.jpg               # Ground surface
-├── lgbg.jpg                 # Authentication background surface
-├── obstacles.png            # Obstacle sprite
-├── profile photo1.png       # User profile avatar asset
-├── explosion1.png - 2.png   # Explosion VFX sprite frames
-└── sprite1.png - 8.png      # Mech character animation sprite frames
-`
+├── main.py                 # Game loop, menus, authentication and score logic
+├── requirements.txt         # Python dependencies
+├── README.md
+├── .gitignore
+├── Script.txt              # Game text / script
+├── ARCADE.TTF              # Arcade font
+├── ARCADE_N.TTF            # Alternate arcade font
+├── perfect-dark-brk/       # Additional font assets
+├── sprite*.png             # Mech animation frames
+├── explosion*.png           # Explosion animation frames
+├── obstacles.png           # Obstacle artwork
+├── back*.jpg / back*.jpeg  # Background and UI artwork
+├── ground.jpg              # Ground artwork
+└── lgbg.jpg                # Login screen background
+```
 
----
+The game also creates or uses local player data at runtime. Keep personal data and local save files out of version control.
 
-## 💡 Engineering Highlights & Problem Solving
+## Dependencies
 
-- **Non-Recursive Scene Controller:** Solved potential call-stack recursion by replacing nested function calls with a top-level procedural state loop that processes scene tokens in O(1) memory.
-- **Parallax Ratio Protection:** Developed an algorithm (sky_speed = current_speed * 0.4) that maintains exact visual depth ratios while world velocity dynamically speeds up.
-- **Single-Window Tkinter Frame Switching:** Replaced window destruction with frame swapping (place / place_forget) to keep event-loops responsive during login navigation.
-- **Hitbox Padding:** Applied 10-pixel inset bounding box calculation ((x+10, y+10, w-20, h-20)) to decouple collision logic from transparent PNG sprite padding.
+The project uses:
 
----
+- [Pygame](https://www.pygame.org/) for rendering, input, and the game loop
+- [Pillow](https://python-pillow.org/) for image handling in the Tkinter UI
+- [MySQL Connector/Python](https://dev.mysql.com/doc/connector-python/en/) for optional database access
+- Tkinter, included with many standard Python installations
 
-## 📜 License
+## Security note
 
-Distributed under the MIT License. See LICENSE for more information.
+This repository has historically contained database credentials in source code and uses local pickle-based user data. **Do not use the current authentication or database implementation with real accounts or sensitive information.** Before deploying or sharing a production build:
+
+1. Rotate any database password that has been committed.
+2. Move database configuration to environment variables or a local, ignored configuration file.
+3. Use a dedicated database account with limited permissions—never a MySQL root account.
+4. Replace plaintext password storage with a suitable password-hashing function.
+5. Do not load pickle files from untrusted sources.
+
+The project is a learning/demo game and its authentication should not be considered production-secure.
+
+## Contributing
+
+Bug reports and improvements are welcome. Please include clear steps to reproduce gameplay bugs and mention your operating system and Python/Pygame versions.
+
+## License
+
+No license file is currently included. Until a license is added, all rights are reserved by the copyright holder; please do not assume the project is available for reuse.
